@@ -68,6 +68,7 @@ public class TreesBatch {
                 choiceStrategy,
                 IntStream.range(0, tryCount)
                         .mapToObj(i -> trainSet.createSplitter(train, random))
+                        .filter(s->s!=null)
         );
 
         if (splitter == null) {
