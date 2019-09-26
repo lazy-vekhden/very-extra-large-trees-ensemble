@@ -1,4 +1,4 @@
-package com.labean.velet.data;
+package com.labean.velet.core;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
