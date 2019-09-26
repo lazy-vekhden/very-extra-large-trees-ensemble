@@ -29,13 +29,17 @@ public class TreesBatch {
         this.tryCount = tryCount;
         this.choiceStrategy = choiceStrategy;
 
-        this.allTest = IntStream.range(0, testSet.size()).mapToObj(i -> i).collect(Collectors.toList());
+        this.allTest = IntStream.range(0, testSet.size())
+                .mapToObj(i -> i)
+                .collect(Collectors.toList());
         this.accumulator = new ThreadSafeAccumulator(testSet.size());
     }
 
 
     public double[] predict() {
-        IntStream.range(0, treesCount).parallel().forEach(i -> createVirtualTree());
+        IntStream.range(0, treesCount)
+                .parallel()
+                .forEach(i -> createVirtualTree());
         return accumulator.getResult();
     }
 
@@ -50,7 +54,10 @@ public class TreesBatch {
 
     private void runVirtualTree(final List<Integer> train, final List<Integer> test, final Random random) {
         if (test.size() == 0) return;
-        int val = (int) train.stream().filter(i -> trainSet.getResult(i)).count();
+        int val = (int) train
+                .stream()
+                .filter(i -> trainSet.getResult(i))
+                .count();
         if (val == 0) return;
         if (val == train.size()) {
             accumulator.addToList(test, 1.);
@@ -59,7 +66,8 @@ public class TreesBatch {
 
         final Splitter splitter = SplitterChoiceStrategy.select(
                 choiceStrategy,
-                IntStream.range(0, tryCount).mapToObj(i -> trainSet.createSplitter(train, random))
+                IntStream.range(0, tryCount)
+                        .mapToObj(i -> trainSet.createSplitter(train, random))
         );
 
         if (splitter == null) {
@@ -68,14 +76,26 @@ public class TreesBatch {
         }
 
         runVirtualTree(
-                train.stream().filter(i -> splitter.match(trainSet.get(i))).collect(Collectors.toList()),
-                test.stream().filter(i -> splitter.match(testSet.get(i))).collect(Collectors.toList()),
+                train
+                        .stream()
+                        .filter(i -> splitter.match(trainSet.get(i)))
+                        .collect(Collectors.toList()),
+                test
+                        .stream()
+                        .filter(i -> splitter.match(testSet.get(i)))
+                        .collect(Collectors.toList()),
                 random
         );
 
         runVirtualTree(
-                train.stream().filter(i -> !splitter.match(trainSet.get(i))).collect(Collectors.toList()),
-                test.stream().filter(i -> !splitter.match(testSet.get(i))).collect(Collectors.toList()),
+                train
+                        .stream()
+                        .filter(i -> !splitter.match(trainSet.get(i)))
+                        .collect(Collectors.toList()),
+                test
+                        .stream()
+                        .filter(i -> !splitter.match(testSet.get(i)))
+                        .collect(Collectors.toList()),
                 random
         );
     }
