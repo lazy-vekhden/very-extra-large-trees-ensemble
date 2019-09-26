@@ -9,12 +9,12 @@ public enum SplitterChoiceStrategy {
     BEST;
 
     static Splitter select(SplitterChoiceStrategy choiceStrategy, Stream<Splitter> splitterStream) {
-        if (choiceStrategy == FIRST) {
+        if (FIRST.equals(choiceStrategy)) {
             return splitterStream
                     .findAny()
                     .orElse(null);
         }
-        if (choiceStrategy == BEST) {
+        if (BEST.equals(choiceStrategy)) {
             return splitterStream
                     .reduce((s1, s2) -> s1.getQuality() < s2.getQuality() ? s2 : s1)
                     .orElse(null);
