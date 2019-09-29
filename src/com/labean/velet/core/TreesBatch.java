@@ -8,17 +8,18 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 public class TreesBatch {
-    final TrainSet trainSet;
-    final RecordSet testSet;
-    final int treesCount;
-    final int treeSize;
-    final int tryCount;
-    final SplitterChoiceStrategy choiceStrategy;
+    private final TrainSet trainSet;
+    private final RecordSet testSet;
+    private final int treesCount;
+    private final int treeSize;
+    private final int tryCount;
+    private final SplitterChoiceStrategy choiceStrategy;
 
-    final List<Integer> allTest;
-    final ThreadSafeAccumulator accumulator;
+    private final List<Integer> allTest;
+    private final ThreadSafeAccumulator accumulator;
 
     public TreesBatch(TrainSet trainSet, RecordSet testSet, int treesCount, int treeSize,
                       int tryCount, SplitterChoiceStrategy choiceStrategy) {
@@ -30,7 +31,7 @@ public class TreesBatch {
         this.choiceStrategy = choiceStrategy;
 
         this.allTest = IntStream.range(0, testSet.size())
-                .mapToObj(i -> i)
+                .boxed()
                 .collect(Collectors.toList());
         this.accumulator = new ThreadSafeAccumulator(testSet.size());
     }
@@ -44,6 +45,7 @@ public class TreesBatch {
     }
 
     private void createVirtualTree() {
+        System.out.println("another virtual tree");
         Random random = ThreadLocalRandom.current();
         Set<Integer> treeTrain = new HashSet<>();
         while (treeTrain.size() < treeSize) {
@@ -56,7 +58,7 @@ public class TreesBatch {
         if (test.size() == 0) return;
         int val = (int) train
                 .stream()
-                .filter(i -> trainSet.getResult(i))
+                .filter(trainSet::getResult)
                 .count();
         if (val == 0) return;
         if (val == train.size()) {
@@ -64,12 +66,8 @@ public class TreesBatch {
             return;
         }
 
-        final Splitter splitter = SplitterChoiceStrategy.select(
-                choiceStrategy,
-                IntStream.range(0, tryCount)
-                        .mapToObj(i -> trainSet.createSplitter(train, random))
-                        .filter(s->s!=null)
-        );
+
+        final Splitter splitter = selectSplitter(train, random);
 
         if (splitter == null) {
             accumulator.addToList(test, val * 1. / train.size());
@@ -99,6 +97,43 @@ public class TreesBatch {
                         .collect(Collectors.toList()),
                 random
         );
+    }
+
+    private Splitter selectSplitter(List<Integer> train, Random random) {
+        Stream<Splitter> creator = IntStream.range(0, tryCount)
+                .mapToObj(i -> trainSet.createSplitter(train, random))
+                .filter(Objects::nonNull);
+        if (choiceStrategy.equals(SplitterChoiceStrategy.FIRST)) return creator.findAny().orElse(null);
+        if (choiceStrategy.equals(SplitterChoiceStrategy.BEST)) {
+            SplitterWrapper wrapper = creator
+                    .map(s -> new SplitterWrapper(s, train))
+                    .reduce((a, b) -> a.quality < b.quality ? b : a)
+                    .orElse(null);
+            if (wrapper == null) return null;
+            return wrapper.splitter;
+        }
+        throw new RuntimeException("not implemented strategy");
+    }
+
+    private class SplitterWrapper {
+        final Splitter splitter;
+        final double quality;
+
+        SplitterWrapper(Splitter splitter, List<Integer> train) {
+            this.splitter = splitter;
+            int[][] distr = new int[2][2];
+            for (int i : train) {
+                int x = splitter.match(trainSet.get(i)) ? 0 : 1;
+                int y = trainSet.getResult(i) ? 0 : 1;
+                ++distr[x][y];
+
+            }
+
+            quality = Math.abs(
+                    distr[0][1] / 1. / (distr[0][1] + distr[0][0]) -
+                            distr[1][1] / 1. / (distr[1][1] + distr[1][0])
+            );
+        }
     }
 
 }
