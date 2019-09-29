@@ -103,10 +103,10 @@ public class TreesBatch {
         Stream<Splitter> creator = IntStream.range(0, tryCount)
                 .mapToObj(i -> trainSet.createSplitter(train, random))
                 .filter(Objects::nonNull);
-        if (choiceStrategy.equals(SplitterChoiceStrategy.FIRST)) return creator.findAny().orElse(null);
-        if (choiceStrategy.equals(SplitterChoiceStrategy.BEST)) {
+        if (SplitterChoiceStrategy.FIRST.equals(choiceStrategy)) return creator.findAny().orElse(null);
+        if (SplitterChoiceStrategy.BEST.equals(choiceStrategy) || SplitterChoiceStrategy.ENTROPY.equals(choiceStrategy)) {
             SplitterWrapper wrapper = creator
-                    .map(s -> new SplitterWrapper(s, train))
+                    .map(s -> new SplitterWrapper(s, train, choiceStrategy))
                     .reduce((a, b) -> a.quality < b.quality ? b : a)
                     .orElse(null);
             if (wrapper == null) return null;
@@ -119,7 +119,7 @@ public class TreesBatch {
         final Splitter splitter;
         final double quality;
 
-        SplitterWrapper(Splitter splitter, List<Integer> train) {
+        SplitterWrapper(Splitter splitter, List<Integer> train, SplitterChoiceStrategy strategy) {
             this.splitter = splitter;
             int[][] distr = new int[2][2];
             for (int i : train) {
@@ -129,10 +129,26 @@ public class TreesBatch {
 
             }
 
-            quality = Math.abs(
-                    distr[0][1] / 1. / (distr[0][1] + distr[0][0]) -
-                            distr[1][1] / 1. / (distr[1][1] + distr[1][0])
-            );
+            quality = calclulateQuality(distr, strategy);
+
+        }
+
+        private double calclulateQuality(int[][] distr, SplitterChoiceStrategy strategy) {
+            if(SplitterChoiceStrategy.BEST.equals(strategy))
+                return Math.abs(
+                        distr[0][1] / 1. / (distr[0][1] + distr[0][0]) -
+                                distr[1][1] / 1. / (distr[1][1] + distr[1][0])
+                );
+            if(SplitterChoiceStrategy.ENTROPY.equals(strategy))
+                return -Math.max(entropy(distr[0]), entropy(distr[1]));
+            throw  new RuntimeException("not implemented");
+        }
+
+        private double entropy(int[] pair) {
+            if(pair[0] == 0) return 0;
+            if(pair[1] == 0) return 0;
+            double p = pair[0]/1. /(pair[0]+pair[1]);
+            return -p*Math.log(p) - (1-p)*Math.log(1-p);
         }
     }
 
